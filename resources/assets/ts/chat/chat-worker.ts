@@ -23,9 +23,10 @@ import DispatchListener from 'dispatch-listener';
 import Dispatcher from 'dispatcher';
 import { transaction } from 'mobx';
 import Channel from 'models/chat/channel';
-import Message, { MessageJSON } from 'models/chat/message';
+import Message from 'models/chat/message';
 import RootDataStore from 'stores/root-data-store';
 import ChatAPI from './chat-api';
+import { MessageJSON } from './chat-api-responses';
 
 export default class ChatWorker implements DispatchListener {
   private dispatcher: Dispatcher;
@@ -40,7 +41,7 @@ export default class ChatWorker implements DispatchListener {
 
   private api: ChatAPI;
 
-  private updateXHR: boolean;
+  private updateXHR: boolean = false;
 
   constructor(dispatcher: Dispatcher, rootDataStore: RootDataStore) {
     this.dispatcher = dispatcher;
@@ -54,39 +55,18 @@ export default class ChatWorker implements DispatchListener {
   handleDispatchAction(action: DispatcherAction) {
     if (action instanceof ChatMessageSendAction) {
       this.sendMessage(action.message);
+    } else if (action instanceof WindowFocusAction) {
+      this.windowIsActive = true;
+    } else if (action instanceof WindowBlurAction) {
+      this.windowIsActive = false;
     }
-
-    if (action instanceof WindowFocusAction) {
-      this.windowActive();
-    }
-
-    if (action instanceof WindowBlurAction) {
-      this.windowIdle();
-    }
-  }
-
-  markAsRead(channelId: number) {
-    const channel: Channel = this.rootDataStore.channelStore.getOrCreate(channelId);
-    const lastRead: number = channel.lastMessageId;
-
-    if (!lastRead || channel.lastReadId >= lastRead) {
-      return;
-    }
-
-    this.api.markAsRead(channel.channelId, lastRead)
-      .then(() => {
-        channel.lastReadId = lastRead;
-      })
-      .catch((err) => {
-        console.debug('markAsRead error', err);
-      });
   }
 
   addMessages(channelId: number, messages: MessageJSON[]) {
     const newMessages: Message[] = [];
 
     transaction(() => {
-      _.forEach(messages, (json: MessageJSON) => {
+      messages.forEach((json: MessageJSON) => {
         const newMessage: Message = Message.fromJSON(json);
         newMessage.sender = this.rootDataStore.userStore.getOrCreate(json.sender_id, json.sender);
         newMessages.push(newMessage);
@@ -97,8 +77,8 @@ export default class ChatWorker implements DispatchListener {
   }
 
   sendMessage(message: Message) {
-    const channelId: number = message.channelId;
-    const channel: Channel = this.rootDataStore.channelStore.getOrCreate(channelId);
+    const channelId = message.channelId;
+    const channel = this.rootDataStore.channelStore.getOrCreate(channelId);
 
     if (channel.newChannel) {
       const users = channel.users.slice();
@@ -159,7 +139,7 @@ export default class ChatWorker implements DispatchListener {
         }
 
         transaction(() => {
-          _.forEach(updateJson.messages, (message: MessageJSON) => {
+          updateJson.messages.forEach((message: MessageJSON) => {
             const newMessage = Message.fromJSON(message);
             newMessage.sender = this.rootDataStore.userStore.getOrCreate(message.sender_id, message.sender);
             this.dispatcher.dispatch(new ChatMessageAddAction(newMessage));
@@ -193,13 +173,5 @@ export default class ChatWorker implements DispatchListener {
       this.updateTimerId = undefined;
       this.updateXHR = false;
     }
-  }
-
-  windowIdle = () => {
-    this.windowIsActive = false;
-  }
-
-  windowActive = () => {
-    this.windowIsActive = true;
   }
 }

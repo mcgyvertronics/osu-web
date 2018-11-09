@@ -16,22 +16,18 @@
  *    along with osu!web.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { WindowBlurAction, WindowFocusAction } from 'actions/window-focus-actions';
+import { UserLogoutAction } from 'actions/user-login-actions';
 import Dispatcher from './dispatcher';
 
-export default class WindowFocusObserver {
+export default class UserLoginObserver {
   private dispatcher: Dispatcher;
 
   constructor(window: Window, dispatcher: Dispatcher) {
     this.dispatcher = dispatcher;
-    $(window).on('blur focus', this.focusChange);
+    $(window.document).on('ajax:success', '.js-logout-link', this.userLogout);
   }
 
-  focusChange = (e: JQuery.Event<EventTarget>) => {
-    if (e.type === 'focus') {
-      this.dispatcher.dispatch(new WindowFocusAction());
-    } else {
-      this.dispatcher.dispatch(new WindowBlurAction());
-    }
+  userLogout = () => {
+    this.dispatcher.dispatch(new UserLogoutAction());
   }
 }

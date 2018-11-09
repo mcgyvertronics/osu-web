@@ -18,10 +18,12 @@
 
 import { ChatMessageAddAction, ChatMessageSendAction, ChatMessageUpdateAction } from 'actions/chat-actions';
 import DispatcherAction from 'actions/dispatcher-action';
+import { UserLogoutAction } from 'actions/user-login-actions';
+import { ChannelJSON } from 'chat/chat-api-responses';
 import DispatchListener from 'dispatch-listener';
 import Dispatcher from 'dispatcher';
 import {action, computed, observable} from 'mobx';
-import Channel, { ChannelJSON } from 'models/chat/channel';
+import Channel from 'models/chat/channel';
 import Message from 'models/chat/message';
 import RootDataStore from './root-data-store';
 
@@ -40,16 +42,14 @@ export default class ChannelStore implements DispatchListener {
   handleDispatchAction(dispatchedAction: DispatcherAction) {
     if (dispatchedAction instanceof ChatMessageSendAction) {
       this.getOrCreate(dispatchedAction.message.channelId).addMessages(dispatchedAction.message, true);
-    }
-
-    if (dispatchedAction instanceof ChatMessageAddAction) {
+    } else if (dispatchedAction instanceof ChatMessageAddAction) {
       this.getOrCreate(dispatchedAction.message.channelId).addMessages(dispatchedAction.message);
-    }
-
-    if (dispatchedAction instanceof ChatMessageUpdateAction) {
+    } else if (dispatchedAction instanceof ChatMessageUpdateAction) {
       const channel: Channel = this.getOrCreate(dispatchedAction.message.channelId);
       channel.updateMessage(dispatchedAction.message);
       channel.resortMessages();
+    } else if (dispatchedAction instanceof UserLogoutAction) {
+      this.flushStore();
     }
   }
 
@@ -57,11 +57,38 @@ export default class ChannelStore implements DispatchListener {
     return this.maxMessageId;
   }
 
+  @action
+  flushStore() {
+    this.channels = observable.map<number, Channel>();
+    this.maxMessageId = 0;
+    this.loaded = false;
+  }
+
   @computed get
-  sortedByPresence(): Channel[] {
+  nonPmChannels(): Channel[] {
     const sortedChannels: Channel[] = [];
-    this.channels.forEach((channel, channelId) => {
-      sortedChannels.push(channel);
+    this.channels.forEach((channel) => {
+      if (channel.type !== 'PM') {
+        sortedChannels.push(channel);
+      }
+    });
+
+    return sortedChannels.sort((a, b) => {
+      if (a.name === b.name) {
+        return 0;
+      }
+
+      return a.name > b.name ? -1 : 1;
+    });
+  }
+
+  @computed get
+  pmChannels(): Channel[] {
+    const sortedChannels: Channel[] = [];
+    this.channels.forEach((channel) => {
+      if (channel.type === 'PM') {
+        sortedChannels.push(channel);
+      }
     });
 
     return sortedChannels.sort((a, b) => {
@@ -77,6 +104,10 @@ export default class ChannelStore implements DispatchListener {
     });
   }
 
+  get(channelId: number): Channel | undefined {
+    return this.channels.get(channelId);
+  }
+
   @action
   getOrCreate(channelId: number): Channel {
     let channel = this.channels.get(channelId);
@@ -90,7 +121,7 @@ export default class ChannelStore implements DispatchListener {
   }
 
   findPM(userId: number): Channel | null {
-    for (const [channelId, channel] of this.channels) {
+    for (const [, channel] of this.channels) {
       if (channel.type !== 'PM') {
         continue;
       }

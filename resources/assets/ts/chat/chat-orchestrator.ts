@@ -16,16 +16,17 @@
  *    along with osu!web.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {ChatChannelSwitchAction, ChatMessageUpdateAction} from 'actions/chat-actions';
+import {ChatChannelSwitchAction} from 'actions/chat-actions';
 import DispatcherAction from 'actions/dispatcher-action';
 import { WindowBlurAction, WindowFocusAction } from 'actions/window-focus-actions';
 import DispatchListener from 'dispatch-listener';
 import Dispatcher from 'dispatcher';
 import { transaction } from 'mobx';
 import Channel from 'models/chat/channel';
-import Message, { MessageJSON } from 'models/chat/message';
+import Message from 'models/chat/message';
 import RootDataStore from 'stores/root-data-store';
 import ChatAPI from './chat-api';
+import { MessageJSON } from './chat-api-responses';
 
 export default class ChatOrchestrator implements DispatchListener {
   private dispatcher: Dispatcher;
@@ -45,15 +46,13 @@ export default class ChatOrchestrator implements DispatchListener {
   handleDispatchAction(action: DispatcherAction) {
     if (action instanceof ChatChannelSwitchAction) {
       this.changeChannel(action.channelId);
-    }
-
-    if (action instanceof WindowFocusAction) {
-      this.windowActive();
-      this.markAsRead(this.rootDataStore.uiState.chat.selected);
-    }
-
-    if (action instanceof WindowBlurAction) {
-      this.windowIdle();
+    } else if (action instanceof WindowFocusAction) {
+      this.windowIsActive = true;
+      if (this.rootDataStore.channelStore.loaded) {
+        this.markAsRead(this.rootDataStore.uiState.chat.selected);
+      }
+    } else if (action instanceof WindowBlurAction) {
+      this.windowIsActive = false;
     }
   }
 
@@ -85,10 +84,10 @@ export default class ChatOrchestrator implements DispatchListener {
   }
 
   markAsRead(channelId: number) {
-    const channel: Channel = this.rootDataStore.channelStore.getOrCreate(channelId);
-    const lastRead: number = channel.lastMessageId;
+    const channel = this.rootDataStore.channelStore.getOrCreate(channelId);
+    const lastRead = channel.lastMessageId;
 
-    if (!lastRead || channel.lastReadId >= lastRead) {
+    if (!channel.isUnread) {
       return;
     }
 
@@ -102,7 +101,7 @@ export default class ChatOrchestrator implements DispatchListener {
   }
 
   loadChannel(channelId: number): Promise<void> {
-    const channel: Channel = this.rootDataStore.channelStore.getOrCreate(channelId);
+    const channel = this.rootDataStore.channelStore.getOrCreate(channelId);
 
     if (channel.loading) {
       return Promise.resolve();
@@ -127,21 +126,13 @@ export default class ChatOrchestrator implements DispatchListener {
     const newMessages: Message[] = [];
 
     transaction(() => {
-      _.forEach(messages, (json: MessageJSON) => {
-        const newMessage: Message = Message.fromJSON(json);
+      messages.forEach((json: MessageJSON) => {
+        const newMessage = Message.fromJSON(json);
         newMessage.sender = this.rootDataStore.userStore.getOrCreate(json.sender_id, json.sender);
         newMessages.push(newMessage);
       });
 
       this.rootDataStore.channelStore.addMessages(channelId, newMessages);
     });
-  }
-
-  windowIdle = () => {
-    this.windowIsActive = false;
-  }
-
-  windowActive = () => {
-    this.windowIsActive = true;
   }
 }

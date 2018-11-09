@@ -16,15 +16,18 @@
  *    along with osu!web.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// This works around vh units being inconsistent across browsers (read: on mobile).
-// You can use this in less/css with calc/var, e.g.:
-// height: calc(var(--vh, 1vh) ~'*' 100);
+/**
+ * This works around vh units being inconsistent across browsers (read: on mobile).
+ * You can use this in less/css with calc/var, e.g.:
+ * height: calc(var(--vh, 1vh) ~'*' 100);
+ */
 export default class WindowVHPatcher {
   private window: Window;
 
   constructor(window: Window) {
     this.window = window;
     $(this.window).on('throttled-resize.windowVHPatch', this.handleResize);
+    this.handleResize();
   }
 
   handleResize = () => {

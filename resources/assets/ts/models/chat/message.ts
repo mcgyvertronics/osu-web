@@ -16,26 +16,16 @@
  *    along with osu!web.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import { MessageJSON } from 'chat/chat-api-responses';
 import { action, observable} from 'mobx';
-import User, { UserJSON } from 'models/user';
-import Channel from './channel';
-
-export interface MessageJSON {
-  content: string;
-  is_action: boolean;
-  message_id: number;
-  sender: UserJSON;
-  sender_id: number;
-  channel_id: number;
-  timestamp: string;
-}
+import User from 'models/user';
 
 export default class Message {
-  @observable messageId: number;
+  @observable messageId: number = -1;
   @observable uuid: string = osu.uuid();
-  @observable channelId: number;
+  @observable channelId: number = -1;
   @observable sender: User;
-  @observable content: string;
+  @observable content: string = '';
   @observable timestamp: string = moment().toISOString();
   @observable isAction: boolean = false;
 
@@ -44,6 +34,7 @@ export default class Message {
 
   constructor() {
     this.uuid = osu.uuid();
+    this.sender = new User(-1); // placeholder user
   }
 
   @action
@@ -66,7 +57,6 @@ export default class Message {
     return this;
   }
 
-  @action
   static fromJSON(json: MessageJSON): Message {
     const message = Object.create(Message.prototype);
     return Object.assign(message, {
@@ -78,9 +68,5 @@ export default class Message {
       timestamp: json.timestamp,
       uuid: osu.uuid(),
     });
-  }
-
-  static reviver(key: string, value: any): any {
-    return key === '' ? Message.fromJSON(value) : value;
   }
 }

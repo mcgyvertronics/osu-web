@@ -20,8 +20,6 @@ import { ChatChannelSwitchAction } from 'actions/chat-actions';
 import Dispatcher from 'dispatcher';
 import HeaderV3 from 'header-v3';
 import { observer, Provider } from 'mobx-react';
-import Channel, { ChannelJSON } from 'models/chat/channel';
-import User, { UserJSON } from 'models/user';
 import * as React from 'react';
 import RootDataStore from 'stores/root-data-store';
 import ChatWorker from './chat-worker';
@@ -32,85 +30,55 @@ import InputBox from './input-box';
 interface PropsInterface {
   dataStore: RootDataStore;
   dispatcher: Dispatcher;
+  initialChannel?: number;
   worker: ChatWorker;
-  presence: ChannelJSON[];
-}
-
-interface SendToJSON {
-  target: UserJSON;
-  can_message: boolean;
 }
 
 @observer
 export default class MainView extends React.Component<PropsInterface, any> {
-  constructor(props: any) {
+  constructor(props: PropsInterface) {
     super(props);
 
-    if (!_.isEmpty(props.presence)) {
-      this.props.dataStore.channelStore.updatePresence(props.presence);
+    if (this.props.initialChannel) {
+      this.props.dispatcher.dispatch(new ChatChannelSwitchAction(this.props.initialChannel));
     }
   }
 
   componentDidMount() {
     $('html').addClass('osu-layout--mobile-app');
-
-    this.init();
-  }
-
-  init = () => {
-    const sendTo: SendToJSON = osu.parseJson('json-sendto');
-    let channelId: number;
-
-    if (!_.isEmpty(sendTo)) {
-      const target: User = this.props.dataStore.userStore.getOrCreate(sendTo.target.id, sendTo.target); // pre-populate userStore with target
-      let channel: Channel | null = this.props.dataStore.channelStore.findPM(target.id);
-
-      if (channel) {
-        channelId = channel.channelId;
-        this.props.dispatcher.dispatch(new ChatChannelSwitchAction(channelId));
-      } else {
-        channel = new Channel(-1);
-        channel.newChannel = true;
-        channel.channelId = -1;
-        channel.name = target.username;
-        channel.icon = target.avatarUrl;
-        channel.type = 'PM';
-        channel.users = [currentUser.id, target.id];
-        channel.moderated = !sendTo.can_message;
-
-        this.props.dataStore.channelStore.channels.set(-1, channel);
-        this.props.dispatcher.dispatch(new ChatChannelSwitchAction(-1));
-      }
-    } else {
-      if (!_.isEmpty(this.props.presence)) {
-        channelId = this.props.dataStore.channelStore.sortedByPresence[0].channelId;
-        this.props.dispatcher.dispatch(new ChatChannelSwitchAction(channelId));
-      } else {
-        console.debug('presence missing...?');
-      }
-    }
-
     this.props.worker.startPolling();
   }
 
   componentWillUnmount() {
-    this.props.worker.stopPolling();
     $('html').removeClass('osu-layout--mobile-app');
+    this.props.worker.stopPolling();
   }
 
   render(): React.ReactNode {
-    const dataStore: RootDataStore = this.props.dataStore;
+    const lazerLink = 'https://github.com/ppy/osu/releases';
     return(
       <div>
         <HeaderV3 theme='chat' title='Chat' />
-        <Provider dataStore={dataStore} dispatcher={this.props.dispatcher}>
-          <div className='chat osu-page osu-page--chat'>
-            <ConversationList />
-            <div className='chat__conversation-area'>
-              <ConversationView />
-              <InputBox />
+        <Provider dataStore={this.props.dataStore} dispatcher={this.props.dispatcher}>
+          {this.props.dataStore.channelStore.loaded ? (
+            <div className='chat osu-page osu-page--chat'>
+              <ConversationList />
+              <div className='chat__conversation-area'>
+                <ConversationView />
+                <InputBox />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className='chat osu-page osu-page--chat'>
+              <div className='chat__not-active'>
+                <Img2x src='/images/layout/chat/none-yet.png' alt='Art by Badou_Rammsteiner' title='Art by Badou_Rammsteiner' />
+                <div className='chat__title'>{osu.trans('chat.no-conversations.title')}</div>
+                <div className='chat__instructions'>{osu.trans('chat.no-conversations.howto')}</div>
+                <div dangerouslySetInnerHTML={{__html: osu.trans('chat.no-conversations.lazer', {link: lazerLink})}} />
+                <div dangerouslySetInnerHTML={{__html: osu.trans('chat.no-conversations.pm_limitations', {link: lazerLink})}} />
+              </div>
+            </div>
+          )}
         </Provider>
       </div>
     );

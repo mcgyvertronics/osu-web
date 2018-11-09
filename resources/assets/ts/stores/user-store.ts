@@ -17,10 +17,12 @@
  */
 
 import DispatcherAction from 'actions/dispatcher-action';
+import { UserLogoutAction } from 'actions/user-login-actions';
+import { UserJSON } from 'chat/chat-api-responses';
 import DispatchListener from 'dispatch-listener';
 import Dispatcher from 'dispatcher';
 import {action, observable} from 'mobx';
-import User, { UserJSON } from 'models/user';
+import User from 'models/user';
 import RootDataStore from './root-data-store';
 
 export default class UserStore implements DispatchListener {
@@ -34,12 +36,19 @@ export default class UserStore implements DispatchListener {
   }
 
   handleDispatchAction(dispatchedAction: DispatcherAction) {
-    // whee
+    if (dispatchedAction instanceof UserLogoutAction) {
+      this.flushStore();
+    }
+  }
+
+  @action
+  flushStore() {
+    this.users = observable.map<number, User>();
   }
 
   @action
   getOrCreate(userId: number, props?: UserJSON): User {
-    let user: User | undefined = this.users.get(userId);
+    let user = this.users.get(userId);
 
     // TODO: update from props if newer?
     if (user && user.loaded) {

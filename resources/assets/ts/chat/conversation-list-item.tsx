@@ -28,32 +28,35 @@ export default class ConversationListItem extends React.Component<any, {}> {
   switch = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
 
-    if (this.props.dataStore.uiState.chat.selected !== this.props.channel_id) {
-      this.props.dispatcher.dispatch(new ChatChannelSwitchAction(this.props.channel_id));
+    if (this.props.dataStore.uiState.chat.selected !== this.props.channelId) {
+      this.props.dispatcher.dispatch(new ChatChannelSwitchAction(this.props.channelId));
     }
   }
 
   render(): React.ReactNode {
     const dataStore: RootDataStore = this.props.dataStore;
     const uiState = dataStore.uiState.chat;
-    const conversation = dataStore.channelStore.getOrCreate(this.props.channel_id);
-    const selected = this.props.channel_id === uiState.selected;
+    const conversation = dataStore.channelStore.get(this.props.channelId);
 
-    let className = 'conversation-list-item';
-    if (selected) {
-      className += ' conversation-list-item--selected';
+    if (!conversation) {
+      return;
+    }
+
+    let className = 'chat-conversation-list-item';
+    if (this.props.channelId === uiState.selected) {
+      className += ' chat-conversation-list-item--selected';
     }
 
     if (conversation.isUnread) {
-      className += ' conversation-list-item--unread';
+      className += ' chat-conversation-list-item--unread';
     }
 
     return (
       <a href='#' className={className} onClick={this.switch}>
-        <div className='conversation-list-item__unread-indicator' />
-        <img className='conversation-list-item__avatar' src={conversation.icon} />
-        <div className='conversation-list-item__name'>{conversation.name}</div>
-        <div className='conversation-list-item__chevron'>
+        <div className='chat-conversation-list-item__unread-indicator' />
+        <img className='chat-conversation-list-item__avatar' src={conversation.icon} />
+        <div className='chat-conversation-list-item__name'>{conversation.name}</div>
+        <div className='chat-conversation-list-item__chevron'>
           <i className='fas fa-chevron-right' />
         </div>
       </a>

@@ -16,31 +16,22 @@
  *    along with osu!web.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import { ChannelJSON, ChannelType } from 'chat/chat-api-responses';
 import { action, computed, observable, transaction} from 'mobx';
+import User from 'models/user';
 import Message from './message';
-
-export interface ChannelJSON {
-  channel_id: number;
-  type: 'PUBLIC'|'PRIVATE'|'MULTIPLAYER'|'SPECTATOR'|'TEMPORARY'|'PM'|'GROUP';
-  name: string;
-  description?: string;
-  icon?: string;
-  users: number[];
-  last_read_id: number;
-  last_message_id: number;
-}
 
 export default class Channel {
   @observable channelId: number;
-  @observable type: string;
-  @observable name: string;
+  @observable type: ChannelType = 'NEW';
+  @observable name: string = '';
   @observable description?: string;
   @observable icon?: string;
 
   @observable messages: Message[] = observable([]);
 
   @observable lastMessageId: number = -1;
-  @observable lastReadId: number = -1;
+  @observable lastReadId?: number;
 
   @observable users: number[] = [];
 
@@ -54,7 +45,6 @@ export default class Channel {
     this.channelId = channelId;
   }
 
-  @action
   static fromJSON(json: ChannelJSON): Channel {
     const channel = Object.create(Channel.prototype);
     return Object.assign(channel, {
@@ -69,9 +59,24 @@ export default class Channel {
     });
   }
 
+  static newPM(target: User): Channel {
+    const channel = new Channel(-1);
+    channel.newChannel = true;
+    channel.type = 'PM';
+    channel.name = target.username;
+    channel.icon = target.avatarUrl;
+    channel.users = [currentUser.id, target.id];
+
+    return channel;
+  }
+
   @computed
   get isUnread(): boolean {
-    return this.lastMessageId > this.lastReadId;
+    if (this.lastReadId) {
+      return this.lastMessageId > this.lastReadId;
+    } else {
+      return this.lastMessageId > -1;
+    }
   }
 
   @action
@@ -118,7 +123,7 @@ export default class Channel {
     this.name = presence.name;
     this.description = presence.description;
     this.type = presence.type;
-    this.icon = presence.icon || '/images/layout/chat/channel-default.png'; // TODO: update with channel-specific icons
+    this.icon = presence.icon || '/images/layout/chat/channel-default.png'; // TODO: update with channel-specific icons?
     this.lastReadId = presence.last_read_id;
 
     this.lastMessageId = _.max([this.lastMessageId, presence.last_message_id]);
