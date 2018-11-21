@@ -22,6 +22,8 @@ import User from 'models/user';
 import Message from './message';
 
 export default class Channel {
+  private backlogSize: number = 100;
+
   @observable channelId: number;
   @observable type: ChannelType = 'NEW';
   @observable name: string = '';
@@ -72,7 +74,7 @@ export default class Channel {
 
   @computed
   get isUnread(): boolean {
-    if (this.lastReadId) {
+    if (this.lastReadId != null) {
       return this.lastMessageId > this.lastReadId;
     } else {
       return this.lastMessageId > -1;
@@ -88,8 +90,8 @@ export default class Channel {
         this.resortMessages();
       }
 
-      if (this.messages.length > 100) {
-        this.messages = _.drop(this.messages, this.messages.length - 100);
+      if (this.messages.length > this.backlogSize) {
+        this.messages = _.drop(this.messages, this.messages.length - this.backlogSize);
       }
     });
   }
