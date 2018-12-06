@@ -91,7 +91,7 @@ class ChannelsControllerTest extends TestCase
                 'channel_id' => $this->privateChannel->channel_id,
                 'user_id' => $this->user->user_id,
             ]))
-            ->assertStatus(403);
+            ->assertStatus(404);
     }
 
     public function testChannelJoinPublic() // succeed
